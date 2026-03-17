@@ -48,7 +48,7 @@ const navItems = [
     label: 'Post',
     isSpecial: true,
     icon: () => (
-      <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-zinc-900 shadow-lg shadow-zinc-900/25 transition-transform active:scale-90">
+      <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-zinc-900 shadow-lg shadow-zinc-900/20 transition-all hover:scale-105 hover:shadow-xl hover:shadow-zinc-900/25 active:scale-90">
         <svg className="h-5 w-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
         </svg>
@@ -99,12 +99,8 @@ export default function BottomNav() {
           .eq('id', user.id)
           .single()
 
-        if (profile?.avatar_url) {
-          setAvatarUrl(profile.avatar_url)
-        } else if (user.user_metadata?.avatar_url) {
-          setAvatarUrl(user.user_metadata.avatar_url)
-        }
-
+        if (profile?.avatar_url) setAvatarUrl(profile.avatar_url)
+        else if (user.user_metadata?.avatar_url) setAvatarUrl(user.user_metadata.avatar_url)
         setFallbackText(profile?.full_name || user.user_metadata?.full_name || profile?.username || user.email || '?')
       }
     }
@@ -113,16 +109,16 @@ export default function BottomNav() {
 
   return (
     <>
-      {/* Mobile Bottom Nav */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-slate-100 bg-white/80 backdrop-blur-2xl backdrop-saturate-150 sm:hidden safe-area-bottom">
-        <div className="mx-auto flex h-16 w-full max-w-md items-center justify-around px-1">
+      {/* ═══ Mobile Bottom Nav ═══ */}
+      <nav className="fixed bottom-0 left-0 right-0 z-50 glass border-t border-slate-100/80 sm:hidden safe-area-bottom">
+        <div className="mx-auto flex h-16 w-full max-w-md items-center justify-around px-2">
           {navItems.filter(item => !item.desktopOnly).map((item) => {
             const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex flex-col items-center justify-center gap-0.5 rounded-2xl px-3 py-1.5 transition-all ${
+                className={`flex min-w-[48px] flex-col items-center justify-center gap-0.5 rounded-2xl px-3 py-1.5 transition-all ${
                   item.isSpecial ? '' : isActive ? 'text-zinc-900' : 'text-slate-400 active:text-slate-600'
                 }`}
               >
@@ -147,16 +143,16 @@ export default function BottomNav() {
         </div>
       </nav>
 
-      {/* Desktop Sidebar */}
-      <aside className="fixed bottom-0 left-0 top-0 z-50 hidden w-64 flex-col border-r border-slate-200/80 bg-white sm:flex">
+      {/* ═══ Desktop Sidebar ═══ */}
+      <aside className="fixed bottom-0 left-0 top-0 z-50 hidden w-64 flex-col border-r border-slate-100 bg-white/95 backdrop-blur-sm sm:flex">
         {/* Logo */}
         <div className="px-8 pb-2 pt-8">
-          <h1 className="text-2xl font-extrabold tracking-tight text-zinc-900">WebRizz</h1>
-          <p className="mt-0.5 text-[11px] font-medium text-slate-400">Developer Community</p>
+          <h1 className="text-xl font-extrabold tracking-tight text-zinc-900">WebRizz</h1>
+          <p className="mt-0.5 text-[11px] font-medium tracking-wide text-slate-400">Developer Community</p>
         </div>
 
         {/* Nav Items */}
-        <nav className="mt-6 flex flex-1 flex-col gap-1 px-4">
+        <nav className="mt-6 flex flex-1 flex-col gap-0.5 px-4">
           {navItems.map((item) => {
             const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
             return (
@@ -165,11 +161,11 @@ export default function BottomNav() {
                 href={item.href}
                 className={`group flex items-center gap-4 rounded-xl px-4 py-3 transition-all ${
                   isActive
-                    ? 'bg-zinc-900 font-bold text-white shadow-lg shadow-zinc-900/10'
-                    : 'font-medium text-slate-600 hover:bg-slate-50 hover:text-zinc-900'
+                    ? 'bg-zinc-900 font-semibold text-white shadow-lg shadow-zinc-900/10'
+                    : 'font-medium text-slate-500 hover:bg-slate-50 hover:text-zinc-900'
                 }`}
               >
-                <div>
+                <div className="transition-transform group-hover:scale-110">
                   {item.href === '/account' && (avatarUrl || fallbackText !== '?') ? (
                     <Avatar
                       src={avatarUrl}
@@ -183,7 +179,7 @@ export default function BottomNav() {
                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                       </svg>
                     ) : (
-                      <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-zinc-900 shadow-sm">
+                      <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-zinc-900 shadow-sm transition-transform group-hover:scale-110">
                         <svg className="h-4 w-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                         </svg>
@@ -205,7 +201,7 @@ export default function BottomNav() {
             <form action="/auth/signout" method="post">
               <button
                 type="submit"
-                className="flex w-full items-center gap-4 rounded-xl px-4 py-2.5 text-left font-medium text-slate-500 transition-all hover:bg-red-50 hover:text-red-600"
+                className="btn-press flex w-full items-center gap-4 rounded-xl px-4 py-2.5 text-left font-medium text-slate-400 transition-all hover:bg-red-50 hover:text-red-600"
               >
                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />

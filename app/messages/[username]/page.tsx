@@ -6,22 +6,11 @@ import { useParams, useRouter } from 'next/navigation'
 import Avatar from '@/components/Avatar'
 import MessageBubble from '@/components/MessageBubble'
 import Link from 'next/link'
+import type { Profile, Message } from '@/lib/types'
+import { getDateLabel } from '@/lib/utils'
+import { MESSAGE_MAX_LENGTH, MESSAGES_LIMIT } from '@/lib/constants'
 
-interface Profile {
-  id: string
-  username: string | null
-  full_name: string | null
-  avatar_url: string | null
-}
-
-interface Message {
-  id: string
-  conversation_id: string
-  sender_id: string
-  content: string
-  created_at: string
-  is_read: boolean
-}
+// Types imported from @/lib/types
 
 export default function ChatPage() {
   const { username } = useParams<{ username: string }>()
@@ -89,7 +78,7 @@ export default function ChatPage() {
           .select('*')
           .eq('conversation_id', existingConvo.id)
           .order('created_at', { ascending: true })
-          .limit(200)
+          .limit(MESSAGES_LIMIT)
 
         setMessages(messagesData || [])
 
@@ -238,17 +227,7 @@ export default function ChatPage() {
     }
   }
 
-  // Group messages by date
-  function getDateLabel(dateStr: string) {
-    const date = new Date(dateStr)
-    const today = new Date()
-    const yesterday = new Date(today)
-    yesterday.setDate(yesterday.getDate() - 1)
-
-    if (date.toDateString() === today.toDateString()) return 'Today'
-    if (date.toDateString() === yesterday.toDateString()) return 'Yesterday'
-    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: date.getFullYear() !== today.getFullYear() ? 'numeric' : undefined })
-  }
+  // getDateLabel imported from @/lib/utils
 
   if (loading) {
     return (
@@ -342,7 +321,7 @@ export default function ChatPage() {
             onChange={(e) => setNewMessage(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Type a message..."
-            maxLength={2000}
+            maxLength={MESSAGE_MAX_LENGTH}
             className="flex-1 rounded-full border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-zinc-900 placeholder-slate-400 outline-none transition-colors focus:border-zinc-400 focus:bg-white focus:ring-1 focus:ring-zinc-400"
           />
           <button

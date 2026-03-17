@@ -5,12 +5,23 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
 import Avatar from '@/components/Avatar'
+import type { Profile } from '@/lib/types'
+import type { User } from '@supabase/supabase-js'
+import {
+  MAX_AVATAR_SIZE_BYTES,
+  USERNAME_MIN_LENGTH,
+  USERNAME_REGEX,
+  BIO_MAX_LENGTH,
+  DISPLAY_NAME_MAX_LENGTH,
+  USERNAME_MAX_LENGTH,
+  SUCCESS_BANNER_DURATION_MS,
+} from '@/lib/constants'
 
 export default function SettingsPage() {
   const supabase = createClient()
   const router = useRouter()
-  const [user, setUser] = useState<any>(null)
-  const [profile, setProfile] = useState<any>(null)
+  const [user, setUser] = useState<User | null>(null)
+  const [profile, setProfile] = useState<Profile | null>(null)
 
   // Editable fields
   const [fullName, setFullName] = useState('')
@@ -57,8 +68,8 @@ export default function SettingsPage() {
     const file = e.target.files?.[0]
     if (!file) return
 
-    if (file.size > 5 * 1024 * 1024) {
-      setError('Image must be under 5MB')
+    if (file.size > MAX_AVATAR_SIZE_BYTES) {
+      setError(`Image must be under ${MAX_AVATAR_SIZE_BYTES / 1024 / 1024}MB`)
       return
     }
 
@@ -72,12 +83,12 @@ export default function SettingsPage() {
       setUsernameError('Username is required')
       return false
     }
-    if (value.length < 3) {
-      setUsernameError('Username must be at least 3 characters')
+    if (value.length < USERNAME_MIN_LENGTH) {
+      setUsernameError(`Username must be at least ${USERNAME_MIN_LENGTH} characters`)
       return false
     }
-    if (!/^[a-zA-Z0-9_]+$/.test(value)) {
-      setUsernameError('Only letters, numbers, and underscores')
+    if (!USERNAME_REGEX.test(value)) {
+      setUsernameError('Only lowercase letters, numbers, and underscores')
       return false
     }
     setUsernameError(null)
@@ -158,16 +169,16 @@ export default function SettingsPage() {
       setAvatarUrl(newAvatarUrl)
       setAvatarFile(null)
       setAvatarPreview(null)
-      setProfile((prev: any) => ({
+      setProfile((prev: Profile | null) => prev ? ({
         ...prev,
         full_name: fullName.trim(),
         username: username.toLowerCase().trim(),
         bio: bio.trim(),
         avatar_url: newAvatarUrl,
-      }))
+      }) : null)
 
       setSaved(true)
-      setTimeout(() => setSaved(false), 3000)
+      setTimeout(() => setSaved(false), SUCCESS_BANNER_DURATION_MS)
     } catch {
       setError('Something went wrong. Please try again.')
     } finally {

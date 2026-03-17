@@ -7,15 +7,9 @@ import BottomNav from '@/components/BottomNav'
 import Avatar from '@/components/Avatar'
 import { calculateAllUsersPoints, type BadgeTier } from '@/lib/points'
 import Link from 'next/link'
+import type { LeaderboardEntry } from '@/lib/types'
 
-interface LeaderboardEntry {
-  userId: string
-  username: string
-  full_name: string | null
-  avatar_url: string | null
-  totalPoints: number
-  badge: BadgeTier
-}
+// Type imported from @/lib/types
 
 export default function ScoreboardPage() {
   const supabase = createClient()

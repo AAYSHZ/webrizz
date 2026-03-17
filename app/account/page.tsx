@@ -6,34 +6,14 @@ import { useEffect, useState } from 'react'
 import BottomNav from '@/components/BottomNav'
 import Avatar from '@/components/Avatar'
 import Link from 'next/link'
-import ReelViewer from '@/components/ReelViewer'
+import dynamic from 'next/dynamic'
 import { type User } from '@supabase/supabase-js'
 import { calculateUserPoints, type PointsResult } from '@/lib/points'
+import type { Reel, Profile } from '@/lib/types'
 
-interface Profile {
-  id: string
-  full_name: string | null
-  username: string | null
-  avatar_url: string | null
-}
+const ReelViewer = dynamic(() => import('@/components/ReelViewer'), { ssr: false })
 
-interface Reel {
-  id: string
-  video_url: string
-  title: string | null
-  caption: string
-  category: string | null
-  created_at: string
-  user_id: string
-  profiles: {
-    username: string | null
-    full_name: string | null
-    avatar_url: string | null
-  } | null
-  likes_count: number
-  is_liked: boolean
-  comments_count: number
-}
+// Types imported from @/lib/types
 
 export default function AccountPage() {
   const supabase = createClient()
@@ -46,7 +26,6 @@ export default function AccountPage() {
   const [selectedReel, setSelectedReel] = useState<Reel | null>(null)
   const [followersCount, setFollowersCount] = useState(0)
   const [followingCount, setFollowingCount] = useState(0)
-  const [totalLikes, setTotalLikes] = useState(0)
   const [pointsResult, setPointsResult] = useState<PointsResult | null>(null)
 
   useEffect(() => {
@@ -96,12 +75,9 @@ export default function AccountPage() {
           : { data: [] }
 
         const countMap: Record<string, number> = {}
-        let likesTotal = 0
         allLikes?.forEach(l => {
           countMap[l.reel_id] = (countMap[l.reel_id] || 0) + 1
-          likesTotal++
         })
-        setTotalLikes(likesTotal)
 
         // Fetch current user's likes
         const { data: userLikes } = user && reelIds.length > 0
@@ -228,6 +204,12 @@ export default function AccountPage() {
                 <Link href="/settings" className="rounded-xl bg-slate-100 px-5 py-1.5 text-sm font-semibold text-zinc-900 transition-colors hover:bg-slate-200">
                   Edit Profile
                 </Link>
+                {/* @ts-expect-error - is_admin is dynamically added to schema */}
+                {profile?.is_admin && (
+                  <Link href="/admin" className="rounded-xl bg-indigo-600 px-5 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-700">
+                    Admin Panel
+                  </Link>
+                )}
               </div>
             </div>
 
@@ -252,15 +234,23 @@ export default function AccountPage() {
             )}
 
             {/* Mobile: Edit Profile Button */}
-            <div className="mt-4 flex w-full gap-2 sm:hidden">
-              <Link href="/settings" className="flex-1 rounded-xl bg-slate-100 px-4 py-2 text-center text-sm font-semibold text-zinc-900 transition-colors hover:bg-slate-200 active:bg-slate-300">
-                Edit Profile
-              </Link>
-              <Link href="/messages" className="flex items-center justify-center rounded-xl bg-slate-100 px-3 py-2 text-zinc-900 transition-colors hover:bg-slate-200 active:bg-slate-300 sm:hidden">
-                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 8.511c.884.284 1.5 1.128 1.5 2.097v4.286c0 1.136-.847 2.1-1.98 2.193-.34.027-.68.052-1.02.072v3.091l-3-3c-1.354 0-2.694-.055-4.02-.163a2.115 2.115 0 0 1-.825-.242m9.345-8.334a2.126 2.126 0 0 0-.476-.095 48.64 48.64 0 0 0-8.048 0c-1.131.094-1.976 1.057-1.976 2.192v4.286c0 .837.46 1.58 1.155 1.951m9.345-8.334V6.637c0-1.621-1.152-3.026-2.76-3.235A48.455 48.455 0 0 0 11.25 3c-2.115 0-4.198.137-6.24.402-1.608.209-2.76 1.614-2.76 3.235v6.226c0 1.621 1.152 3.026 2.76 3.235.577.075 1.157.14 1.74.194V21l4.155-4.155" />
-                </svg>
-              </Link>
+            <div className="mt-4 flex w-full flex-col gap-2 sm:hidden">
+              <div className="flex w-full gap-2">
+                <Link href="/settings" className="flex-1 rounded-xl bg-slate-100 px-4 py-2 text-center text-sm font-semibold text-zinc-900 transition-colors hover:bg-slate-200 active:bg-slate-300">
+                  Edit Profile
+                </Link>
+                <Link href="/messages" className="flex items-center justify-center rounded-xl bg-slate-100 px-3 py-2 text-zinc-900 transition-colors hover:bg-slate-200 active:bg-slate-300 sm:hidden">
+                  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 8.511c.884.284 1.5 1.128 1.5 2.097v4.286c0 1.136-.847 2.1-1.98 2.193-.34.027-.68.052-1.02.072v3.091l-3-3c-1.354 0-2.694-.055-4.02-.163a2.115 2.115 0 0 1-.825-.242m9.345-8.334a2.126 2.126 0 0 0-.476-.095 48.64 48.64 0 0 0-8.048 0c-1.131.094-1.976 1.057-1.976 2.192v4.286c0 .837.46 1.58 1.155 1.951m9.345-8.334V6.637c0-1.621-1.152-3.026-2.76-3.235A48.455 48.455 0 0 0 11.25 3c-2.115 0-4.198.137-6.24.402-1.608.209-2.76 1.614-2.76 3.235v6.226c0 1.621 1.152 3.026 2.76 3.235.577.075 1.157.14 1.74.194V21l4.155-4.155" />
+                  </svg>
+                </Link>
+              </div>
+              {/* @ts-expect-error - is_admin is dynamically added to schema */}
+              {profile?.is_admin && (
+                <Link href="/admin" className="w-full rounded-xl bg-indigo-600 px-4 py-2 text-center text-sm font-semibold text-white transition-colors hover:bg-indigo-700 active:bg-indigo-800">
+                  Admin Panel
+                </Link>
+              )}
             </div>
 
             {/* Desktop Stats Row */}

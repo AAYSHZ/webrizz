@@ -4,8 +4,13 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { useState, useRef } from 'react'
 import BottomNav from '@/components/BottomNav'
-
-const DEFAULT_CATEGORIES = ['Frontend', 'Backend', 'Fullstack', 'DevOps', 'Other']
+import {
+  ALLOWED_VIDEO_TYPES,
+  MAX_VIDEO_SIZE_BYTES,
+  DEFAULT_CATEGORIES,
+  TITLE_MAX_LENGTH,
+  CAPTION_MAX_LENGTH,
+} from '@/lib/constants'
 
 export default function PostPage() {
   const router = useRouter()
@@ -26,17 +31,19 @@ export default function PostPage() {
   function handleVideoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (file) {
-      if (!file.type.startsWith('video/')) {
-        setError('Please select a valid video file.')
+      if (!ALLOWED_VIDEO_TYPES.includes(file.type)) {
+        setError('Please select a valid video file (MP4, WebM, or MOV).')
         return
       }
-      if (file.size > 50 * 1024 * 1024) { // 50MB limit
-        setError('Video file is too large. Max size is 50MB.')
+      if (file.size > MAX_VIDEO_SIZE_BYTES) {
+        setError(`Video file is too large. Max size is ${MAX_VIDEO_SIZE_BYTES / 1024 / 1024}MB.`)
         return
       }
       
       setVideoFile(file)
-      setVideoPreview(URL.createObjectURL(file))
+      if (videoPreview) URL.revokeObjectURL(videoPreview)
+      const url = URL.createObjectURL(file)
+      setVideoPreview(url)
       setError(null)
     }
   }
@@ -108,15 +115,15 @@ export default function PostPage() {
     <div className="min-h-screen bg-white pb-24 font-sans text-slate-900 sm:ml-64 sm:pb-8">
 
       {/* Header */}
-      <div className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur-xl">
-        <h1 className="text-center text-lg font-bold text-zinc-900 sm:text-left sm:text-xl">New Reel</h1>
+      <div className="sticky top-0 z-30 border-b border-slate-100 glass px-5 py-4">
+        <h1 className="text-center text-base font-bold tracking-tight text-zinc-900 sm:text-left sm:text-lg">New Reel</h1>
       </div>
 
-      <div className="mx-auto max-w-lg p-4 sm:p-8">
+      <div className="animate-page-enter mx-auto max-w-lg p-5 sm:p-8">
         
         {error && (
-          <div className="mb-6 flex animate-in fade-in items-center gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-            <svg className="h-5 w-5 shrink-0 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="animate-fade-in mb-6 flex items-center gap-3 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+              <svg className="h-5 w-5 shrink-0 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             <p>{error}</p>
@@ -130,8 +137,8 @@ export default function PostPage() {
             <label className="mb-2 block text-sm font-medium text-slate-700">Video File</label>
             <div 
               onClick={() => fileInputRef.current?.click()}
-              className={`relative flex cursor-pointer flex-col items-center justify-center overflow-hidden rounded-xl border-2 border-dashed transition-all hover:bg-slate-50 ${
-                videoPreview ? 'aspect-[9/16] max-h-[60vh] border-transparent bg-black' : 'h-48 border-slate-300 bg-slate-50'
+              className={`relative flex cursor-pointer flex-col items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed transition-all hover:bg-slate-50/80 ${
+                videoPreview ? 'aspect-[9/16] max-h-[60vh] border-transparent bg-black' : 'h-52 border-slate-200 bg-slate-50/50'
               }`}
             >
               {videoPreview ? (
@@ -183,7 +190,7 @@ export default function PostPage() {
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="Give your reel a catchy title"
-                className="block w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 transition-shadow focus:border-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900"
+                className="block w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm text-zinc-900 placeholder-slate-400 transition-all focus:border-zinc-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
               />
             </div>
 
@@ -199,7 +206,7 @@ export default function PostPage() {
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Tell us what this reel is about..."
-                className="block w-full resize-none rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 transition-shadow focus:border-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900"
+                className="block w-full resize-none rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm text-zinc-900 placeholder-slate-400 transition-all focus:border-zinc-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
               />
             </div>
 
@@ -212,7 +219,7 @@ export default function PostPage() {
                 id="category"
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                className="block w-full appearance-none rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 transition-shadow focus:border-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900"
+                className="block w-full appearance-none rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm text-zinc-900 transition-all focus:border-zinc-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
               >
                 {DEFAULT_CATEGORIES.map((cat) => (
                   <option key={cat} value={cat}>{cat}</option>
@@ -244,7 +251,7 @@ export default function PostPage() {
             <button
               type="submit"
               disabled={loading || !videoFile}
-              className="flex w-full items-center justify-center rounded-lg bg-zinc-900 px-4 py-3.5 text-sm font-semibold text-white transition-all hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:ring-offset-2 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:bg-zinc-900 disabled:active:scale-100"
+              className="btn-press flex w-full items-center justify-center rounded-xl bg-zinc-900 px-4 py-3.5 text-sm font-semibold text-white shadow-lg shadow-zinc-900/10 transition-all hover:bg-zinc-800 hover:shadow-xl hover:shadow-zinc-900/15 focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none"
             >
               {loading ? (
                 <>

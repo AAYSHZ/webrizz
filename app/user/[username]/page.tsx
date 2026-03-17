@@ -9,12 +9,19 @@ import Avatar from '@/components/Avatar'
 import ReelViewer from '@/components/ReelViewer'
 import Link from 'next/link'
 import { calculateUserPoints, type PointsResult } from '@/lib/points'
+import { CountUp } from '@/components/gamification/CountUp'
+import { SkillRadarChart } from '@/components/gamification/SkillRadarChart'
 
 interface Profile {
   id: string
   full_name: string | null
   username: string | null
   avatar_url: string | null
+  xp?: number
+  coins?: number
+  level?: number
+  current_badge?: string
+  skill_points?: any
 }
 
 interface Reel {
@@ -69,7 +76,7 @@ export default function UserProfilePage() {
       const decodedUsername = decodeURIComponent(username)
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
-        .select('id, full_name, username, avatar_url')
+        .select('id, full_name, username, avatar_url, xp, coins, level, current_badge, skill_points')
         .eq('username', decodedUsername)
         .single()
 
@@ -321,18 +328,31 @@ export default function UserProfilePage() {
               @{profile.username}
             </span>
 
-            {/* Level Badge */}
-            {pointsResult && (
-              <div className="mt-2.5 flex items-center gap-2">
-                <span className={`inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r ${pointsResult.badge.color} px-3 py-1 text-xs font-bold tracking-wide ${pointsResult.badge.textColor} ${pointsResult.badge.glow ? `shadow-lg ${pointsResult.badge.glow}` : ''}`}>
-                  <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24">
+            {/* Gamification Stats Level & Badges */}
+            <div className="mt-3 flex items-center gap-4 flex-wrap">
+              {profile.current_badge && (
+                <div className="flex items-center gap-2 rounded-full bg-linear-to-r from-blue-500 to-indigo-600 px-3 py-1 shadow-md shadow-blue-500/20 text-white">
+                  <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M11.645 20.91l-.007-.003-.022-.012a15.247 15.247 0 01-.383-.218 25.18 25.18 0 01-4.244-3.17C4.688 15.36 2.25 12.174 2.25 8.25 2.25 5.322 4.714 3 7.688 3A5.5 5.5 0 0112 5.052 5.5 5.5 0 0116.313 3c2.973 0 5.437 2.322 5.437 5.25 0 3.925-2.438 7.111-4.739 9.256a25.175 25.175 0 01-4.244 3.17 15.247 15.247 0 01-.383.219l-.022.012-.007.004-.003.001a.752.752 0 01-.704 0l-.003-.001z" />
                   </svg>
-                  {pointsResult.badge.name}
+                  <span className="text-xs font-bold tracking-wide uppercase">Lvl {profile.level || 1} • {profile.current_badge}</span>
+                </div>
+              )}
+              
+              <div className="flex items-center gap-2">
+                <span className="text-xl font-extrabold text-blue-600">
+                  <CountUp end={profile.xp || 0} />
                 </span>
-                <span className="text-xs font-medium text-slate-400">{pointsResult.totalPoints} pts</span>
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">XP</span>
+                
+                <span className="text-slate-300">|</span>
+                
+                <span className="text-xl font-extrabold text-amber-500">
+                  <CountUp end={profile.coins || 0} />
+                </span>
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Coins</span>
               </div>
-            )}
+            </div>
 
             {/* Mobile: Follow & Message */}
             <div className="mt-4 flex w-full gap-2 sm:hidden">
@@ -380,6 +400,15 @@ export default function UserProfilePage() {
 
           </div>
         </div>
+
+        {/* Gamification Radar Chart Section */}
+        {profile.skill_points && (
+          <div className="mt-8 mb-4 border border-slate-200 rounded-3xl bg-white shadow-sm overflow-hidden p-6 sm:p-8">
+            <h3 className="text-lg font-bold text-zinc-900 mb-2">Developer Skill Matrix</h3>
+            <p className="text-sm text-slate-500 mb-6">A breakdown of {profile.username}&apos;s expertise across algorithms, web dev, AI, and systems.</p>
+            <SkillRadarChart skills={profile.skill_points} />
+          </div>
+        )}
 
         {/* Tab Divider */}
         <div className="mt-8 border-t border-slate-200">

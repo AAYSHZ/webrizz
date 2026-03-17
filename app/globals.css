@@ -1,8 +1,41 @@
 @import "tailwindcss";
 
+/* ─────────────────────────────────────────────────
+   WEBRIZZ DESIGN SYSTEM
+   Built on existing color palette:
+   Primary: zinc-900 (#18181b)
+   Neutral: slate-50 to slate-900
+   Accent: blue-400, indigo-400
+   Status: red, emerald
+   Background: white (#ffffff)
+   Foreground: #0a0a0a
+   ───────────────────────────────────────────────── */
+
+/* ── Design Tokens ── */
 :root {
   --background: #ffffff;
   --foreground: #0a0a0a;
+
+  /* Elevation shadows (consistent depth system) */
+  --shadow-xs: 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.06), 0 2px 4px -2px rgba(0,0,0,0.04);
+  --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.06), 0 4px 6px -4px rgba(0,0,0,0.04);
+  --shadow-xl: 0 20px 25px -5px rgba(0,0,0,0.06), 0 8px 10px -6px rgba(0,0,0,0.04);
+
+  /* Consistent border radius */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-full: 9999px;
+
+  /* Transition defaults */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --duration-fast: 150ms;
+  --duration-normal: 200ms;
+  --duration-slow: 300ms;
 }
 
 @theme inline {
@@ -12,20 +45,134 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/* ── Base Resets ── */
+*,
+*::before,
+*::after {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+  text-rendering: optimizeLegibility;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  line-height: 1.6;
+  letter-spacing: -0.011em;
 }
 
-/* Smooth scrolling */
-html {
-  scroll-behavior: smooth;
+/* ── Global Transitions ──
+   All interactive elements get smooth transitions by default */
+a, button, input, textarea, select,
+[role="button"], [tabindex] {
+  transition-property: color, background-color, border-color, box-shadow, transform, opacity;
+  transition-duration: var(--duration-normal);
+  transition-timing-function: var(--ease-out);
 }
 
-/* Like heart animation */
+/* ── Focus Ring ── */
+*:focus-visible {
+  outline: 2px solid #18181b;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ── Selection ── */
+::selection {
+  background-color: #18181b;
+  color: #ffffff;
+}
+
+/* ── Scrollbar ── */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Thin scrollbar for panels */
+.thin-scrollbar::-webkit-scrollbar { width: 4px; }
+.thin-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.thin-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e180; border-radius: 9999px; }
+.thin-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+/* ── Safe Areas ── */
+.safe-area-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
+.pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
+
+/* ═══════════════════════════════════════════════════
+   ANIMATIONS & MICRO-INTERACTIONS
+   ═══════════════════════════════════════════════════ */
+
+/* Page entrance */
+@keyframes page-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-page-enter {
+  animation: page-enter 0.4s var(--ease-out) forwards;
+}
+
+/* Staggered children entrance */
+@keyframes stagger-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-stagger-in > * {
+  opacity: 0;
+  animation: stagger-in 0.35s var(--ease-out) forwards;
+}
+.animate-stagger-in > *:nth-child(1) { animation-delay: 0.04s; }
+.animate-stagger-in > *:nth-child(2) { animation-delay: 0.08s; }
+.animate-stagger-in > *:nth-child(3) { animation-delay: 0.12s; }
+.animate-stagger-in > *:nth-child(4) { animation-delay: 0.16s; }
+.animate-stagger-in > *:nth-child(5) { animation-delay: 0.20s; }
+.animate-stagger-in > *:nth-child(6) { animation-delay: 0.24s; }
+.animate-stagger-in > *:nth-child(7) { animation-delay: 0.28s; }
+.animate-stagger-in > *:nth-child(8) { animation-delay: 0.32s; }
+.animate-stagger-in > *:nth-child(n+9) { animation-delay: 0.36s; }
+
+/* Fade in */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in {
+  animation: fade-in 0.3s var(--ease-out) forwards;
+}
+
+/* Scale in (modals, overlays) */
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.95) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+.animate-scale-in {
+  animation: scale-in 0.25s var(--ease-out) forwards;
+}
+
+/* Slide up (bottom sheets) */
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(100%); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-slide-up {
+  animation: slide-up 0.35s var(--ease-out) forwards;
+}
+
+/* Backdrop fade */
+@keyframes backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.animate-backdrop {
+  animation: backdrop-in 0.2s ease-out forwards;
+}
+
+/* Like heart pop */
 @keyframes like-pop {
   0% { transform: scale(0); opacity: 0; }
   15% { transform: scale(1.3); opacity: 1; }
@@ -34,47 +181,85 @@ html {
   80% { transform: scale(1); opacity: 1; }
   100% { transform: scale(1); opacity: 0; }
 }
-
 .animate-like-pop {
-  animation: like-pop 0.8s ease-out forwards;
+  animation: like-pop 0.8s var(--ease-out) forwards;
 }
 
-/* Fade in animation */
-@keyframes fade-in {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: translateY(0); }
+/* Pulse glow (subtle) */
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.7; }
+}
+.animate-pulse-glow {
+  animation: pulse-glow 3s ease-in-out infinite;
 }
 
-.animate-fade-in {
-  animation: fade-in 0.3s ease-out forwards;
+/* Shimmer for skeleton loading */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    #f1f5f9 25%,
+    #e2e8f0 37%,
+    #f1f5f9 63%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.8s ease-in-out infinite;
+  border-radius: var(--radius-sm);
 }
 
-/* Safe area for bottom nav on notch phones */
-.safe-area-bottom {
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+/* ═══════════════════════════════════════════════════
+   COMPONENT UTILITIES
+   ═══════════════════════════════════════════════════ */
+
+/* Glass effect for overlays/nav */
+.glass {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
 }
 
-.pb-safe {
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+.glass-dark {
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
 }
 
-/* Hide scrollbar */
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
+/* Card elevation */
+.card {
+  background: white;
+  border: 1px solid #f1f5f9;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-xs);
+  transition: box-shadow var(--duration-normal) var(--ease-out),
+              transform var(--duration-normal) var(--ease-out);
 }
-.no-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
+.card:hover {
+  box-shadow: var(--shadow-md);
+}
+.card-interactive:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+.card-interactive:active {
+  transform: translateY(0) scale(0.995);
 }
 
-/* Better focus ring */
-*:focus-visible {
-  outline: 2px solid #18181b;
-  outline-offset: 2px;
+/* Button press effect */
+.btn-press:active {
+  transform: scale(0.97);
+  transition-duration: 80ms;
 }
 
-/* Selection color */
-::selection {
-  background-color: #18181b;
-  color: #ffffff;
+/* Dot pattern background */
+.dot-pattern {
+  background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
+  background-size: 20px 20px;
 }
+
+/* Glow orbs */
+.glow-blue { background: rgba(96, 165, 250, 0.12); filter: blur(80px); }
+.glow-indigo { background: rgba(129, 140, 248, 0.12); filter: blur(80px); }

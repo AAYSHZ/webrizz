@@ -6,33 +6,8 @@ import { useRouter } from 'next/navigation'
 import BottomNav from '@/components/BottomNav'
 import Avatar from '@/components/Avatar'
 import Link from 'next/link'
-
-interface ConversationItem {
-  id: string
-  participant_one: string
-  participant_two: string
-  last_message_at: string
-  last_message_text: string
-  other_user: {
-    id: string
-    username: string | null
-    full_name: string | null
-    avatar_url: string | null
-  }
-}
-
-function timeAgo(dateStr: string) {
-  const seconds = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000)
-  if (seconds < 60) return 'now'
-  const minutes = Math.floor(seconds / 60)
-  if (minutes < 60) return `${minutes}m`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours}h`
-  const days = Math.floor(hours / 24)
-  if (days < 7) return `${days}d`
-  const weeks = Math.floor(days / 7)
-  return `${weeks}w`
-}
+import type { ConversationItem } from '@/lib/types'
+import { timeAgo } from '@/lib/utils'
 
 export default function MessagesPage() {
   const supabase = createClient()
@@ -48,23 +23,14 @@ export default function MessagesPage() {
       if (!user) { router.push('/login'); return }
       setCurrentUserId(user.id)
 
-      // Fetch conversations where user is either participant
-      const { data: convosAsP1 } = await supabase
+      // Fixed: single OR query instead of two separate queries
+      const { data: allConvos } = await supabase
         .from('conversations')
         .select('*')
-        .eq('participant_one', user.id)
+        .or(`participant_one.eq.${user.id},participant_two.eq.${user.id}`)
         .order('last_message_at', { ascending: false })
 
-      const { data: convosAsP2 } = await supabase
-        .from('conversations')
-        .select('*')
-        .eq('participant_two', user.id)
-        .order('last_message_at', { ascending: false })
-
-      const allConvos = [...(convosAsP1 || []), ...(convosAsP2 || [])]
-        .sort((a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime())
-
-      if (allConvos.length === 0) {
+      if (!allConvos || allConvos.length === 0) {
         setLoading(false)
         return
       }
@@ -106,7 +72,7 @@ export default function MessagesPage() {
     load()
   }, [supabase, router])
 
-  // Realtime: listen for conversation updates (new messages update last_message_at)
+  // Realtime: listen for conversation updates
   useEffect(() => {
     if (!currentUserId) return
 
@@ -173,22 +139,22 @@ export default function MessagesPage() {
     <div className="relative min-h-screen bg-white pb-20 sm:ml-64 sm:pb-0">
 
       {/* Header */}
-      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/80 px-4 py-3 backdrop-blur-xl sm:px-6">
-        <h1 className="text-center text-base font-bold tracking-wide text-zinc-900 sm:text-left sm:text-xl">
+      <header className="sticky top-0 z-30 border-b border-slate-100 glass px-5 py-4 sm:px-6">
+        <h1 className="text-center text-base font-bold tracking-tight text-zinc-900 sm:text-left sm:text-lg">
           Messages
         </h1>
       </header>
 
-      <main className="mx-auto max-w-2xl">
+      <main className="animate-page-enter mx-auto max-w-2xl">
         {conversations.length === 0 ? (
           <div className="flex flex-col items-center justify-center px-8 py-24 text-center">
-            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full border-2 border-slate-200">
+            <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl border border-slate-100 bg-slate-50">
               <svg className="h-8 w-8 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z" />
               </svg>
             </div>
-            <h3 className="text-xl font-bold text-zinc-900">No messages yet</h3>
-            <p className="mt-2 text-sm text-slate-500">Visit someone&apos;s profile and tap Message to start a conversation.</p>
+            <h3 className="text-lg font-bold tracking-tight text-zinc-900">No messages yet</h3>
+            <p className="mt-2 text-sm leading-relaxed text-slate-400">Visit someone&apos;s profile and tap Message to start a conversation.</p>
           </div>
         ) : (
           <div className="divide-y divide-slate-100">

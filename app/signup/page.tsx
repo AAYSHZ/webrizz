@@ -4,6 +4,8 @@ import { Suspense, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { ALLOWED_IMAGE_TYPES, MAX_AVATAR_SIZE_BYTES, USERNAME_MIN_LENGTH } from '@/lib/constants'
+import { sanitizeUsername } from '@/lib/utils'
 
 function SignupForm() {
   const supabase = createClient()
@@ -24,9 +26,19 @@ function SignupForm() {
   function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (file) {
+      if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+        setError('Please select a valid image file (JPEG, PNG, GIF, or WebP).')
+        return
+      }
+      if (file.size > MAX_AVATAR_SIZE_BYTES) {
+        setError(`Image must be under ${MAX_AVATAR_SIZE_BYTES / 1024 / 1024}MB.`)
+        return
+      }
       setAvatarFile(file)
+      if (avatarPreview) URL.revokeObjectURL(avatarPreview)
       const url = URL.createObjectURL(file)
       setAvatarPreview(url)
+      setError(null)
     }
   }
 
@@ -39,9 +51,7 @@ function SignupForm() {
     try {
       let avatarUrl = null
       
-      // 1. Upload avatar FIRST if a file is selected
       if (avatarFile) {
-        // Create a temporary unique ID for the file path since we don't have a user ID yet
         const tempId = crypto.randomUUID()
         const fileExt = avatarFile.name.split('.').pop()
         const filePath = `${tempId}-${Date.now()}.${fileExt}`
@@ -54,7 +64,6 @@ function SignupForm() {
           const { data: urlData } = supabase.storage
             .from('avatars')
             .getPublicUrl(filePath)
-          
           avatarUrl = urlData.publicUrl
         } else {
           setError('Failed to upload avatar image. ' + uploadError.message)
@@ -63,7 +72,6 @@ function SignupForm() {
         }
       }
 
-      // 2. Sign up the user WITH the avatar URL included in metadata
       const signUpData = {
         full_name: fullName,
         username: username,
@@ -73,9 +81,7 @@ function SignupForm() {
       const { data, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
-        options: {
-          data: signUpData,
-        },
+        options: { data: signUpData },
       })
 
       if (signUpError) {
@@ -84,12 +90,9 @@ function SignupForm() {
         return
       }
 
-      // Check if email confirmation is required
       if (data.session) {
-        // Auto-confirmed — redirect to account
         router.push('/dashboard')
       } else {
-        // Email confirmation required
         setSuccess('Check your email to confirm your account!')
       }
     } catch {
@@ -102,20 +105,20 @@ function SignupForm() {
   return (
     <>
       {success && (
-        <div className="mb-6 flex items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-          <svg className="h-5 w-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="animate-fade-in mb-6 flex items-center gap-3 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+          <svg className="h-5 w-5 shrink-0 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
           </svg>
-          {success}
+          <span>{success}</span>
         </div>
       )}
 
       {error && (
-        <div className="mb-6 flex items-center gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-          <svg className="h-5 w-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="animate-fade-in mb-6 flex items-center gap-3 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <svg className="h-5 w-5 shrink-0 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
-          {error}
+          <span>{error}</span>
         </div>
       )}
 
@@ -123,17 +126,17 @@ function SignupForm() {
         
         {/* Avatar upload */}
         <div className="flex flex-col items-start">
-          <label className="mb-2 block text-sm font-medium text-slate-700">Profile Photo</label>
+          <label className="mb-2.5 block text-sm font-medium text-slate-700">Profile Photo</label>
           <div className="flex items-center gap-4">
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="group relative flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border border-slate-300 bg-slate-50 transition-colors hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:ring-offset-2"
+              className="group relative flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border-2 border-dashed border-slate-200 bg-slate-50 transition-all hover:border-slate-300 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:ring-offset-2"
             >
               {avatarPreview ? (
                 <img src={avatarPreview} alt="Avatar preview" className="h-full w-full object-cover" />
               ) : (
-                <svg className="h-6 w-6 text-slate-400 transition-colors group-hover:text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="h-5 w-5 text-slate-400 transition-colors group-hover:text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
@@ -143,11 +146,11 @@ function SignupForm() {
               <button 
                 type="button" 
                 onClick={() => fileInputRef.current?.click()}
-                className="text-sm font-medium text-zinc-900 hover:underline"
+                className="text-sm font-medium text-zinc-900 hover:text-zinc-700 hover:underline underline-offset-4"
               >
                 Upload an image
               </button>
-              <span className="text-xs text-slate-500">JPG, GIF or PNG. Max size 2MB.</span>
+              <span className="text-xs text-slate-400">JPG, PNG, GIF or WebP. Max {MAX_AVATAR_SIZE_BYTES / 1024 / 1024}MB.</span>
             </div>
           </div>
           <input ref={fileInputRef} type="file" accept="image/*" onChange={handleAvatarChange} className="hidden" />
@@ -156,9 +159,7 @@ function SignupForm() {
         {/* Grid for Name & Username */}
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
           <div>
-            <label htmlFor="fullName" className="mb-1.5 block text-sm font-medium text-slate-700">
-              Full Name
-            </label>
+            <label htmlFor="fullName" className="mb-1.5 block text-sm font-medium text-slate-700">Full Name</label>
             <input
               id="fullName"
               type="text"
@@ -166,34 +167,30 @@ function SignupForm() {
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               placeholder="John Doe"
-              className="block w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 transition-shadow focus:border-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900"
+              className="block w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm text-zinc-900 placeholder-slate-400 transition-all focus:border-zinc-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
             />
           </div>
 
           <div>
-            <label htmlFor="username" className="mb-1.5 block text-sm font-medium text-slate-700">
-              Username
-            </label>
+            <label htmlFor="username" className="mb-1.5 block text-sm font-medium text-slate-700">Username</label>
             <div className="relative">
-              <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">@</span>
+              <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400 text-sm">@</span>
               <input
                 id="username"
                 type="text"
                 required
                 minLength={3}
                 value={username}
-                onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
+                onChange={(e) => setUsername(sanitizeUsername(e.target.value))}
                 placeholder="johndoe"
-                className="block w-full rounded-lg border border-slate-300 bg-white py-2.5 pl-8 pr-4 text-sm text-slate-900 placeholder-slate-400 transition-shadow focus:border-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900"
+                className="block w-full rounded-xl border border-slate-200 bg-slate-50/50 py-3 pl-9 pr-4 text-sm text-zinc-900 placeholder-slate-400 transition-all focus:border-zinc-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
               />
             </div>
           </div>
         </div>
 
         <div>
-          <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-slate-700">
-            Email address
-          </label>
+          <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-slate-700">Email address</label>
           <input
             id="email"
             type="email"
@@ -201,14 +198,12 @@ function SignupForm() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="you@example.com"
-            className="block w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 transition-shadow focus:border-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900"
+            className="block w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm text-zinc-900 placeholder-slate-400 transition-all focus:border-zinc-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
           />
         </div>
 
         <div>
-          <label htmlFor="password" className="mb-1.5 block text-sm font-medium text-slate-700">
-            Password
-          </label>
+          <label htmlFor="password" className="mb-1.5 block text-sm font-medium text-slate-700">Password</label>
           <input
             id="password"
             type="password"
@@ -217,15 +212,15 @@ function SignupForm() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="••••••••"
-            className="block w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 transition-shadow focus:border-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900"
+            className="block w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm text-zinc-900 placeholder-slate-400 transition-all focus:border-zinc-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
           />
         </div>
 
-        <div className="pt-2">
+        <div className="pt-1">
           <button
             type="submit"
             disabled={loading}
-            className="flex w-full items-center justify-center rounded-lg bg-zinc-900 px-4 py-3 text-sm font-semibold text-white transition-all hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:ring-offset-2 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:bg-zinc-900 disabled:active:scale-100"
+            className="btn-press flex w-full items-center justify-center rounded-xl bg-zinc-900 px-4 py-3.5 text-sm font-semibold text-white shadow-lg shadow-zinc-900/10 transition-all hover:bg-zinc-800 hover:shadow-xl hover:shadow-zinc-900/15 focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none"
           >
             {loading ? (
               <>
@@ -249,48 +244,60 @@ export default function SignupPage() {
   return (
     <div className="flex min-h-screen w-full bg-white font-sans text-slate-900">
       
-      {/* LEFT PANEL: Geometric Light Theme Hero */}
-      <div className="relative hidden w-1/2 flex-col justify-center overflow-hidden bg-slate-50 border-r border-slate-200 lg:flex">
-        {/* Subtle dot pattern background */}
-        <div 
-          className="absolute inset-0 opacity-[0.4]" 
-          style={{ backgroundImage: 'radial-gradient(#cbd5e1 1.5px, transparent 1.5px)', backgroundSize: '24px 24px' }} 
-        />
-        
-        {/* Soft glowing accent elements */}
-        <div className="absolute -left-20 -top-20 h-96 w-96 rounded-full bg-blue-400/10 blur-[100px]" />
-        <div className="absolute bottom-10 right-10 h-80 w-80 rounded-full bg-indigo-400/10 blur-[80px]" />
+      {/* LEFT PANEL */}
+      <div className="relative hidden w-1/2 flex-col justify-center overflow-hidden bg-slate-50 border-r border-slate-100 lg:flex">
+        <div className="dot-pattern absolute inset-0 opacity-25" />
+        <div className="absolute -left-24 -top-24 h-[420px] w-[420px] rounded-full glow-blue animate-pulse-glow" />
+        <div className="absolute bottom-0 right-0 h-80 w-80 rounded-full glow-indigo animate-pulse-glow" style={{ animationDelay: '1.5s' }} />
 
-        <div className="relative z-10 flex flex-col items-center justify-center px-16 text-center xl:px-24">
-          <div className="mb-10 flex h-20 w-20 items-center justify-center rounded-2xl bg-zinc-900 text-white shadow-xl shadow-zinc-900/10">
-            <svg className="h-10 w-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="animate-page-enter relative z-10 flex flex-col items-center justify-center px-16 text-center xl:px-24">
+          <div className="mb-10 flex h-[72px] w-[72px] items-center justify-center rounded-2xl bg-zinc-900 text-white shadow-xl shadow-zinc-900/15 transition-transform hover:scale-105">
+            <svg className="h-9 w-9" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 10l-2 1m0 0l-2-1m2 1v2.5M20 7l-2 1m2-1l-2-1m2 1v2.5M14 4l-2-1-2 1M4 7l2-1M4 7l2 1M4 7v2.5M12 21l-2-1m2 1l2-1m-2 1v-2.5M6 18l-2-1v-2.5M18 18l2-1v-2.5" />
             </svg>
           </div>
           <h1 className="mb-6 text-4xl font-extrabold tracking-tight text-zinc-900 xl:text-5xl">
             Build your next great idea.
           </h1>
-          <p className="max-w-md text-lg text-slate-600">
+          <p className="max-w-md text-lg leading-relaxed text-slate-500">
             Join thousands of developers and creators. Experience a beautiful, frictionless workflow designed for scale.
           </p>
         </div>
       </div>
 
-      {/* RIGHT PANEL: Form Section */}
+      {/* RIGHT PANEL */}
       <div className="flex w-full items-center justify-center p-6 sm:p-12 lg:w-1/2">
-        <div className="w-full max-w-[440px]">
-          <div className="mb-8">
-            <h2 className="text-3xl font-bold tracking-tight text-zinc-900">Create an account</h2>
-            <p className="mt-2 text-sm text-slate-600">Enter your details below to get started.</p>
+        <div className="animate-page-enter w-full max-w-[440px]">
+          {/* Mobile logo */}
+          <div className="mb-8 flex items-center gap-3 lg:hidden">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-zinc-900 text-white">
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 10l-2 1m0 0l-2-1m2 1v2.5M20 7l-2 1m2-1l-2-1m2 1v2.5M14 4l-2-1-2 1M4 7l2-1M4 7l2 1M4 7v2.5M12 21l-2-1m2 1l2-1m-2 1v-2.5M6 18l-2-1v-2.5M18 18l2-1v-2.5" />
+              </svg>
+            </div>
+            <span className="text-lg font-bold text-zinc-900">WebRizz</span>
           </div>
 
-          <Suspense fallback={<div className="text-slate-500 text-sm">Loading user form...</div>}>
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl">Create an account</h2>
+            <p className="mt-2 text-sm leading-relaxed text-slate-500">Enter your details below to get started.</p>
+          </div>
+
+          <Suspense fallback={
+            <div className="space-y-5 animate-pulse">
+              <div className="h-16 w-16 rounded-full bg-slate-100" />
+              <div className="h-12 rounded-xl bg-slate-100" />
+              <div className="h-12 rounded-xl bg-slate-100" />
+              <div className="h-12 rounded-xl bg-slate-100" />
+              <div className="h-12 rounded-xl bg-slate-100" />
+            </div>
+          }>
             <SignupForm />
           </Suspense>
 
-          <p className="mt-8 text-center text-sm text-slate-600">
+          <p className="mt-8 text-center text-sm text-slate-500">
             Already have an account?{' '}
-            <Link href="/login" className="font-semibold text-zinc-900 hover:underline">
+            <Link href="/login" className="font-semibold text-zinc-900 transition-colors hover:text-zinc-700 hover:underline underline-offset-4">
               Sign in
             </Link>
           </p>

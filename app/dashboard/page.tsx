@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { formatReelRow } from '@/lib/utils'
+import { REELS_PAGE_SIZE } from '@/lib/constants'
 import ReelViewer from '@/components/ReelViewer'
 import BottomNav from '@/components/BottomNav'
 
@@ -43,7 +45,7 @@ export default async function DashboardPage() {
       comments:comments(count)
     `)
     .order('created_at', { ascending: false })
-    .range(0, 4)
+    .range(0, REELS_PAGE_SIZE - 1)
 
   // Get likes for these reels
   const reelIds = reelsData?.map((r) => r.id) || []
@@ -58,19 +60,9 @@ export default async function DashboardPage() {
 
   const likedSet = new Set(userLikes?.map((l) => l.reel_id) || [])
 
-  const initialReels = (reelsData || []).map((r: any) => ({
-    id: r.id,
-    video_url: r.video_url,
-    title: r.title,
-    caption: r.caption,
-    category: r.category,
-    created_at: r.created_at,
-    user_id: r.user_id,
-    profiles: Array.isArray(r.profiles) ? r.profiles[0] : r.profiles,
-    likes_count: Array.isArray(r.likes) ? r.likes[0]?.count || 0 : r.likes?.count || 0,
-    is_liked: likedSet.has(r.id),
-    comments_count: Array.isArray(r.comments) ? r.comments[0]?.count || 0 : r.comments?.count || 0,
-  }))
+  const initialReels = (reelsData || []).map((r) =>
+    formatReelRow(r as unknown as Record<string, unknown>, likedSet)
+  )
 
   return (
     <div className="relative">

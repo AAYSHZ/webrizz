@@ -3,34 +3,22 @@
 import { createClient } from '@/lib/supabase/client'
 import { useState, useEffect } from 'react'
 import BottomNav from '@/components/BottomNav'
-import ReelViewer from '@/components/ReelViewer'
+import dynamic from 'next/dynamic'
 import Avatar from '@/components/Avatar'
 import Link from 'next/link'
 import { useDebounce } from 'use-debounce'
 import { type User } from '@supabase/supabase-js'
+import type { Reel } from '@/lib/types'
+import { DEBOUNCE_DELAY_MS, SEARCH_RESULTS_LIMIT, SEARCH_PROFILE_LIMIT } from '@/lib/constants'
 
-interface Reel {
-  id: string
-  video_url: string
-  title: string | null
-  caption: string
-  category: string | null
-  created_at: string
-  user_id: string
-  profiles: {
-    username: string | null
-    full_name: string | null
-    avatar_url: string | null
-  } | null
-  likes_count: number
-  is_liked: boolean
-  comments_count: number
-}
+const ReelViewer = dynamic(() => import('@/components/ReelViewer'), { ssr: false })
+
+// Type imported from @/lib/types
 
 export default function SearchPage() {
   const supabase = createClient()
   const [searchQuery, setSearchQuery] = useState('')
-  const [debouncedQuery] = useDebounce(searchQuery, 400)
+  const [debouncedQuery] = useDebounce(searchQuery, DEBOUNCE_DELAY_MS)
 
   interface ProfileResult {
     id: string
@@ -81,7 +69,7 @@ export default function SearchPage() {
         .from('profiles')
         .select('id, username, full_name, avatar_url')
         .or(`username.ilike.${formattedQuery},full_name.ilike.${formattedQuery}`)
-        .limit(10)
+        .limit(SEARCH_PROFILE_LIMIT)
 
       setProfileResults(matchingProfiles || [])
       const matchingUserIds = matchingProfiles?.map(p => p.id) || []
@@ -113,7 +101,7 @@ export default function SearchPage() {
         `)
         .or(baseOrQuery)
         .order('created_at', { ascending: false })
-        .limit(20)
+        .limit(SEARCH_RESULTS_LIMIT)
 
       if (error) {
         console.error('Search error:', error)

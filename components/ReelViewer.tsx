@@ -4,54 +4,21 @@ import { createClient } from '@/lib/supabase/client'
 import { useCallback, useEffect, useRef, useState, memo } from 'react'
 import Avatar from '@/components/Avatar'
 import Link from 'next/link'
-
-interface Reel {
-  id: string
-  video_url: string
-  title: string | null
-  caption: string
-  category: string | null
-  created_at: string
-  user_id: string
-  profiles: {
-    username: string | null
-    full_name: string | null
-    avatar_url: string | null
-  } | null
-  likes_count: number
-  is_liked: boolean
-  comments_count: number
-}
-
-interface Comment {
-  id: string
-  content: string
-  created_at: string
-  user_id: string
-  profiles: {
-    username: string | null
-    avatar_url: string | null
-    full_name: string | null
-  } | null
-}
+import type { Reel, Comment } from '@/lib/types'
+import { timeAgo, formatReelRow } from '@/lib/utils'
+import {
+  REELS_PAGE_SIZE,
+  COMMENTS_LIMIT,
+  COMMENT_MAX_LENGTH,
+  DOUBLE_TAP_THRESHOLD_MS,
+  LIKE_ANIMATION_DURATION_MS,
+  TIMEUPDATE_THROTTLE_MS,
+} from '@/lib/constants'
 
 interface ReelViewerProps {
   initialReels: Reel[]
   currentUserId: string
   currentUserAvatar?: string | null
-}
-
-function timeAgo(dateStr: string): string {
-  const seconds = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000)
-  if (seconds < 60) return 'just now'
-  const minutes = Math.floor(seconds / 60)
-  if (minutes < 60) return `${minutes}m`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours}h`
-  const days = Math.floor(hours / 24)
-  if (days < 7) return `${days}d`
-  const weeks = Math.floor(days / 7)
-  return `${weeks}w`
 }
 
 // Memoized individual reel item to prevent re-renders when other reels change
@@ -74,7 +41,7 @@ const ReelItem = memo(function ReelItem({
   reel: Reel
   index: number
   isActive: boolean
-  isNear: boolean // within ±2 of active
+  isNear: boolean
   isMuted: boolean
   currentUserId: string
   currentUserAvatar?: string | null
@@ -86,7 +53,6 @@ const ReelItem = memo(function ReelItem({
   onShare: (reel: Reel) => void
   onTimeUpdate: (reel: Reel, video: HTMLVideoElement) => void
 }) {
-  // Determine preload strategy
   const preload = isActive ? 'auto' : isNear ? 'metadata' : 'none'
 
   return (
@@ -94,10 +60,9 @@ const ReelItem = memo(function ReelItem({
       data-index={index}
       className="relative mx-auto flex h-[100dvh] w-full max-w-[450px] snap-start snap-always flex-col justify-center sm:aspect-[9/16] sm:h-auto sm:max-h-[100dvh] sm:py-4"
       onClick={() => onVideoTap(index, reel.id, reel.is_liked)}
-      suppressHydrationWarning
     >
       <div className="relative h-full w-full overflow-hidden sm:rounded-2xl sm:shadow-2xl">
-        {/* Video - only render src when near active */}
+        {/* Video */}
         <video
           ref={videoRef}
           src={isNear ? reel.video_url : undefined}
@@ -128,11 +93,7 @@ const ReelItem = memo(function ReelItem({
         {/* Like animation */}
         {likeAnimation && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            <svg
-              className="h-24 w-24 text-white animate-like-pop drop-shadow-lg"
-              viewBox="0 0 24 24"
-              fill="currentColor"
-            >
+            <svg className="h-24 w-24 text-white animate-like-pop drop-shadow-lg" viewBox="0 0 24 24" fill="currentColor">
               <path d="m11.645 20.91-.007-.003-.022-.012a15.247 15.247 0 0 1-.383-.218 25.18 25.18 0 0 1-4.244-3.17C4.688 15.36 2.25 12.174 2.25 8.25 2.25 5.322 4.714 3 7.688 3A5.5 5.5 0 0 1 12 5.052 5.5 5.5 0 0 1 16.313 3c2.973 0 5.437 2.322 5.437 5.25 0 3.925-2.438 7.111-4.739 9.256a25.175 25.175 0 0 1-4.244 3.17 15.247 15.247 0 0 1-.383.219l-.022.012-.007.004-.003.001a.752.752 0 0 1-.704 0l-.003-.001Z" />
             </svg>
           </div>
@@ -142,11 +103,9 @@ const ReelItem = memo(function ReelItem({
         <div className="absolute bottom-24 right-3 flex flex-col items-center gap-5">
           {/* Like */}
           <button
-            onClick={(e) => {
-              e.stopPropagation()
-              onToggleLike(reel.id, reel.is_liked)
-            }}
+            onClick={(e) => { e.stopPropagation(); onToggleLike(reel.id, reel.is_liked) }}
             className="flex flex-col items-center gap-1"
+            aria-label={reel.is_liked ? 'Unlike' : 'Like'}
           >
             <div className={`transition-transform active:scale-125 ${reel.is_liked ? 'text-red-500' : 'text-white'}`}>
               <svg className="h-7 w-7 drop-shadow-lg" viewBox="0 0 24 24" fill={reel.is_liked ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={reel.is_liked ? 0 : 2}>
@@ -158,11 +117,9 @@ const ReelItem = memo(function ReelItem({
 
           {/* Comment */}
           <button
-            onClick={(e) => {
-              e.stopPropagation()
-              onOpenComments(reel.id)
-            }}
+            onClick={(e) => { e.stopPropagation(); onOpenComments(reel.id) }}
             className="flex flex-col items-center gap-1"
+            aria-label="Comments"
           >
             <svg className="h-7 w-7 text-white drop-shadow-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 20.25c4.97 0 9-3.694 9-8.25s-4.03-8.25-9-8.25S3 7.444 3 12c0 2.104.859 4.023 2.273 5.48.432.447.74 1.04.586 1.641a4.483 4.483 0 0 1-.923 1.785A5.969 5.969 0 0 0 6 21c1.282 0 2.47-.402 3.445-1.087.81.22 1.668.337 2.555.337Z" />
@@ -172,11 +129,9 @@ const ReelItem = memo(function ReelItem({
 
           {/* Share */}
           <button
-            onClick={(e) => {
-              e.stopPropagation()
-              onShare(reel)
-            }}
+            onClick={(e) => { e.stopPropagation(); onShare(reel) }}
             className="flex flex-col items-center gap-1"
+            aria-label="Share"
           >
             <svg className="h-7 w-7 text-white drop-shadow-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5" />
@@ -192,15 +147,9 @@ const ReelItem = memo(function ReelItem({
               const avatarSrc = reel.profiles?.avatar_url || (reel.user_id === currentUserId ? currentUserAvatar : null)
               const fallbackText = reel.profiles?.full_name || reel.profiles?.username || '?'
               const profileHref = reel.profiles?.username ? `/user/${reel.profiles.username}` : '#'
-
               return (
                 <Link href={profileHref} onClick={(e) => e.stopPropagation()}>
-                  <Avatar
-                    src={avatarSrc}
-                    fallbackText={fallbackText}
-                    size="md"
-                    className="border-2 border-white/30"
-                  />
+                  <Avatar src={avatarSrc} fallbackText={fallbackText} size="md" className="border-2 border-white/30" />
                 </Link>
               )
             })()}
@@ -221,18 +170,13 @@ const ReelItem = memo(function ReelItem({
           </div>
 
           {reel.title && (
-            <h3 className="mb-1 text-base font-bold text-white drop-shadow-lg line-clamp-1">
-              {reel.title}
-            </h3>
+            <h3 className="mb-1 text-base font-bold text-white drop-shadow-lg line-clamp-1">{reel.title}</h3>
           )}
 
           {reel.caption && (
-            <p className="text-sm text-white/90 drop-shadow-lg line-clamp-2 leading-snug">
-              {reel.caption}
-            </p>
+            <p className="text-sm text-white/90 drop-shadow-lg line-clamp-2 leading-snug">{reel.caption}</p>
           )}
         </div>
-
       </div>
     </div>
   )
@@ -252,7 +196,6 @@ export default function ReelViewer({ initialReels, currentUserId, currentUserAva
 
   // Watch tracking
   const watchedTiers = useRef<Record<string, number>>({})
-  // Throttle ref for timeupdate
   const lastTimeUpdateRef = useRef<number>(0)
 
   // Comments
@@ -262,31 +205,19 @@ export default function ReelViewer({ initialReels, currentUserId, currentUserAva
   const [loadingComments, setLoadingComments] = useState(false)
   const [postingComment, setPostingComment] = useState(false)
 
-  const PAGE_SIZE = 5
-
   // Fetch more reels
   const loadMore = useCallback(async () => {
     if (loading || !hasMore) return
     setLoading(true)
 
-    const from = page * PAGE_SIZE
-    const to = from + PAGE_SIZE - 1
+    const from = page * REELS_PAGE_SIZE
+    const to = from + REELS_PAGE_SIZE - 1
 
     const { data: reelsData, error } = await supabase
       .from('reels')
       .select(`
-        id,
-        video_url,
-        title,
-        caption,
-        category,
-        created_at,
-        user_id,
-        profiles (
-          username,
-          full_name,
-          avatar_url
-        ),
+        id, video_url, title, caption, category, created_at, user_id,
+        profiles (username, full_name, avatar_url),
         likes:likes(count),
         comments:comments(count)
       `)
@@ -308,23 +239,13 @@ export default function ReelViewer({ initialReels, currentUserId, currentUserAva
 
     const likedReelIds = new Set(likesData?.map((l) => l.reel_id) || [])
 
-    const formattedReels: Reel[] = reelsData.map((r: any) => ({
-      id: r.id,
-      video_url: r.video_url,
-      title: r.title,
-      caption: r.caption,
-      category: r.category,
-      created_at: r.created_at,
-      user_id: r.user_id,
-      profiles: Array.isArray(r.profiles) ? r.profiles[0] : r.profiles,
-      likes_count: Array.isArray(r.likes) ? r.likes[0]?.count || 0 : r.likes?.count || 0,
-      is_liked: likedReelIds.has(r.id),
-      comments_count: Array.isArray(r.comments) ? r.comments[0]?.count || 0 : r.comments?.count || 0,
-    }))
+    const formattedReels = reelsData.map((r) =>
+      formatReelRow(r as unknown as Record<string, unknown>, likedReelIds)
+    )
 
     setReels((prev) => [...prev, ...formattedReels])
     setPage((prev) => prev + 1)
-    if (reelsData.length < PAGE_SIZE) setHasMore(false)
+    if (reelsData.length < REELS_PAGE_SIZE) setHasMore(false)
     setLoading(false)
   }, [loading, hasMore, page, supabase, currentUserId])
 
@@ -339,7 +260,6 @@ export default function ReelViewer({ initialReels, currentUserId, currentUserAva
           if (entry.isIntersecting) {
             const index = Number(entry.target.getAttribute('data-index'))
             setActiveIndex(index)
-
             if (index >= reels.length - 2) {
               loadMore()
             }
@@ -364,7 +284,6 @@ export default function ReelViewer({ initialReels, currentUserId, currentUserAva
         video.play().catch(() => {})
       } else {
         video.pause()
-        // Reset far-away videos to free memory
         if (Math.abs(idx - activeIndex) > 2) {
           video.removeAttribute('src')
           video.load()
@@ -373,10 +292,10 @@ export default function ReelViewer({ initialReels, currentUserId, currentUserAva
     })
   }, [activeIndex])
 
-  // Throttled watch progress tracking (runs at most once per 500ms)
+  // Throttled watch progress tracking
   const handleTimeUpdate = useCallback((reel: Reel, video: HTMLVideoElement) => {
     const now = performance.now()
-    if (now - lastTimeUpdateRef.current < 500) return
+    if (now - lastTimeUpdateRef.current < TIMEUPDATE_THROTTLE_MS) return
     lastTimeUpdateRef.current = now
 
     if (!video.duration || reel.user_id === currentUserId) return
@@ -400,31 +319,35 @@ export default function ReelViewer({ initialReels, currentUserId, currentUserAva
       .then(() => {})
   }, [currentUserId, supabase])
 
-  // Toggle like
+  // Toggle like — with error rollback
   const toggleLike = useCallback(async (reelId: string, currentlyLiked: boolean) => {
+    // Optimistic update
     setReels((prev) =>
       prev.map((r) =>
         r.id === reelId
-          ? {
-              ...r,
-              is_liked: !currentlyLiked,
-              likes_count: currentlyLiked ? r.likes_count - 1 : r.likes_count + 1,
-            }
+          ? { ...r, is_liked: !currentlyLiked, likes_count: currentlyLiked ? r.likes_count - 1 : r.likes_count + 1 }
           : r
       )
     )
 
     if (!currentlyLiked) {
       setLikeAnimations((prev) => ({ ...prev, [reelId]: true }))
-      setTimeout(() => {
-        setLikeAnimations((prev) => ({ ...prev, [reelId]: false }))
-      }, 800)
+      setTimeout(() => setLikeAnimations((prev) => ({ ...prev, [reelId]: false })), LIKE_ANIMATION_DURATION_MS)
     }
 
-    if (currentlyLiked) {
-      await supabase.from('likes').delete().eq('user_id', currentUserId).eq('reel_id', reelId)
-    } else {
-      await supabase.from('likes').insert({ user_id: currentUserId, reel_id: reelId })
+    const { error } = currentlyLiked
+      ? await supabase.from('likes').delete().eq('user_id', currentUserId).eq('reel_id', reelId)
+      : await supabase.from('likes').insert({ user_id: currentUserId, reel_id: reelId })
+
+    // Rollback on failure
+    if (error) {
+      setReels((prev) =>
+        prev.map((r) =>
+          r.id === reelId
+            ? { ...r, is_liked: currentlyLiked, likes_count: currentlyLiked ? r.likes_count + 1 : r.likes_count - 1 }
+            : r
+        )
+      )
     }
   }, [supabase, currentUserId])
 
@@ -435,15 +358,12 @@ export default function ReelViewer({ initialReels, currentUserId, currentUserAva
     const last = lastTap.current[reelId] || 0
     const now = Date.now()
 
-    if (now - last < 300) {
-      // Double tap
+    if (now - last < DOUBLE_TAP_THRESHOLD_MS) {
       if (!isLiked) {
         toggleLike(reelId, false)
       } else {
         setLikeAnimations((prev) => ({ ...prev, [reelId]: true }))
-        setTimeout(() => {
-          setLikeAnimations((prev) => ({ ...prev, [reelId]: false }))
-        }, 800)
+        setTimeout(() => setLikeAnimations((prev) => ({ ...prev, [reelId]: false })), LIKE_ANIMATION_DURATION_MS)
       }
       lastTap.current[reelId] = 0
       return
@@ -451,29 +371,32 @@ export default function ReelViewer({ initialReels, currentUserId, currentUserAva
 
     lastTap.current[reelId] = now
 
-    // Single tap — toggle mute after a small delay
     setTimeout(() => {
       if (lastTap.current[reelId] === now) {
         setIsMuted((prev) => !prev)
       }
-    }, 300)
+    }, DOUBLE_TAP_THRESHOLD_MS)
   }, [toggleLike])
 
-  // Share
+  // Share — fixed to use valid URL (user profile instead of non-existent /reel/ route)
   const handleShare = useCallback(async (reel: Reel) => {
     supabase
       .from('shares')
       .upsert({ user_id: currentUserId, reel_id: reel.id }, { onConflict: 'user_id,reel_id' })
       .then(() => {})
 
+    const shareUrl = reel.profiles?.username
+      ? `${window.location.origin}/user/${reel.profiles.username}`
+      : window.location.href
+
     if (navigator.share) {
       await navigator.share({
         title: `Reel by @${reel.profiles?.username || 'user'}`,
         text: reel.caption,
-        url: window.location.origin + '/reel/' + reel.id,
+        url: shareUrl,
       }).catch(() => {})
     } else {
-      await navigator.clipboard.writeText(window.location.origin + '/reel/' + reel.id)
+      await navigator.clipboard.writeText(shareUrl)
     }
   }, [supabase, currentUserId])
 
@@ -488,7 +411,7 @@ export default function ReelViewer({ initialReels, currentUserId, currentUserAva
       .select('id, content, created_at, user_id, profiles(username, avatar_url, full_name)')
       .eq('reel_id', reelId)
       .order('created_at', { ascending: false })
-      .limit(50)
+      .limit(COMMENTS_LIMIT)
 
     if (data) {
       setComments(data.map(c => ({
@@ -559,12 +482,8 @@ export default function ReelViewer({ initialReels, currentUserId, currentUserAva
   return (
     <div
       ref={containerRef}
-      className="h-[100dvh] w-full snap-y snap-mandatory overflow-y-scroll bg-white"
-      style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-      suppressHydrationWarning
+      className="h-[100dvh] w-full snap-y snap-mandatory overflow-y-scroll bg-white no-scrollbar"
     >
-      <style jsx>{`div::-webkit-scrollbar { display: none; }`}</style>
-
       {reels.map((reel, index) => (
         <ReelItem
           key={reel.id}
@@ -615,6 +534,7 @@ export default function ReelViewer({ initialReels, currentUserId, currentUserAva
               <button
                 onClick={() => { setCommentReelId(null); setComments([]); setCommentText('') }}
                 className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-slate-100"
+                aria-label="Close comments"
               >
                 <svg className="h-5 w-5 text-zinc-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -660,6 +580,7 @@ export default function ReelViewer({ initialReels, currentUserId, currentUserAva
                             <button
                               onClick={() => deleteComment(comment.id)}
                               className="ml-auto hidden text-xs text-red-400 hover:text-red-600 group-hover:block"
+                              aria-label="Delete comment"
                             >
                               Delete
                             </button>
@@ -687,17 +608,16 @@ export default function ReelViewer({ initialReels, currentUserId, currentUserAva
                     }
                   }}
                   placeholder="Add a comment..."
-                  maxLength={500}
+                  maxLength={COMMENT_MAX_LENGTH}
                   className="flex-1 rounded-full border border-slate-300 bg-slate-50 px-4 py-2 text-sm text-zinc-900 placeholder:text-slate-400 focus:border-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-400"
                   onClick={(e) => e.stopPropagation()}
+                  aria-label="Write a comment"
                 />
                 <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    postComment()
-                  }}
+                  onClick={(e) => { e.stopPropagation(); postComment() }}
                   disabled={!commentText.trim() || postingComment}
                   className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white transition-colors hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed"
+                  aria-label="Post comment"
                 >
                   {postingComment ? (
                     <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
